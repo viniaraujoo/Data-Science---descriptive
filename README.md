@@ -1,5 +1,5 @@
 # Data-Science-Descriptive
-Repository dedicated to the activities developed in the discipline of Descriptive Data Science - UFCG 2018.1 (professor @nazareno ).
+Repository dedicated to the activities developed in the discipline of Descriptive Data Science - UFCG 2018.1 (teacher [@nazareno](https://github.com/nazareno)).
 
 During the course, we developed analyzes using the R language based on 5 problems explored by several databases.
 
