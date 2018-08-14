@@ -1,0 +1,180 @@
+---
+title: "Analise dos Jogos do Brasil."
+author: "Vinicius Brandão Araújo"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+```{r message=FALSE}
+library(tidyverse)
+library(ggdendro)
+library(here)
+library(plotly)
+library(cluster)
+library(ggfortify)
+library(broom)
+library(stats)
+source(here::here("code/plota_solucoes_hclust.R"))
+```
+Esta análise, realizada no contexto da disciplina Ciência de Dados 1 , tem por objetivo identificar agrupamentos em dados sobre as partitidas oficias que a seleção Brasileira de futebol participou. Essa análise serve de mote para trabalharmos com algumas técnicas de agrupamento de múltiplas (> 2) dimensões utilizando a técnica k-means.
+Para está analise utilizamos uma base de dados deste [site](https://www.kaggle.com/) onde fizemos uma filtragem para seleciona apenas os jogos da seleção Brasileira.
+
+```{r message=FALSE}
+games = read_csv("../data/international-football.csv")
+
+jogos_brasil = games %>% 
+    filter(home_team == "Brazil" | away_team == "Brazil") %>% 
+    mutate(time1 = "Brazil", 
+           time2 = if_else(home_team == "Brazil", away_team, home_team), 
+           score1 = if_else(home_team == "Brazil", home_score, away_score),
+           score2 = if_else(home_team == "Brazil", away_score, home_score) 
+    ) 
+
+historicos = jogos_brasil %>% 
+    group_by(time2) %>% 
+    summarise(
+        jogos = n(),
+        ganhou = sum(score1 > score2) / n(), 
+        empatou = sum(score1 == score2) / n(),
+        perdeu = sum(score1 < score2) / n()
+        )
+historicos = historicos %>%
+            filter(jogos > 2)
+```
+* Vamos agrupar de acordo as seguintes variáveis:
+    +  Quantidade de Jogos
+    +  Proporção de Vitoria
+    +  Proporção de Empate
+    +  Proporção de Vitoria
+
+* No grafico abaixo podemos observar cada seleção no qual o Brasil jogou mais de 2 vezes e com isso está contido a proporção de vitoria,empate e derrota em relação quantidade de jogos entre essas seleções. 
+
+
+```{r message=FALSE}
+p <- historicos %>%
+  ggplot(aes(x = ganhou, 
+             y = jogos, 
+             text = paste("Seleção:", time2,
+                          "\nVitorio:",ganhou,
+                          "\nPerdeu:",perdeu,
+                          "\nEmpatou:",empatou))) + 
+  geom_point(size = 4,
+             color = "#938BA1") +
+  labs(y = "Quantidade de Jogos", 
+       x = "Proporção")
+
+ggplotly(p, tooltip = "text") %>%
+    layout(autosize = F)
+```
+
+*  Podemos observar que o Brasil tende a ter um numero maior de vitorias.
+*  Os times que o Brasil mais jogou são times da america latina podemos associar isto aos campeonatos classificatorio para copa do mundo.
+*  Para está analise consideramos apenas seleções que o Brasil jogou mais do que 2 vezes.
+* Afim de observar como está uma possivel divisão de grupos iremos utilizar o grafico **Dendrogrma**
+    + Um Dendrograma (dendro = árvore) é um tipo específico de diagrama ou representação icónica que organiza determinados fatores e variáveis. Resulta de uma análise          estatística de determinados dados, em que se emprega um método quantitativo que leva a agrupamentos e à sua ordenação hierárquica ascendente
+
+```{r message=FALSE}
+agrupamento_h = historicos %>%
+    as.data.frame() %>% 
+    column_to_rownames("time2") %>% 
+    select(ganhou) %>%
+    dist(method = "euclidian") %>% 
+    hclust(method = "ward.D")
+
+ggdendrogram(agrupamento_h, rotate = T, size = 2, theme_dendro = F) + 
+    labs(y = "Dissimilaridade", x = "", title = "Dendrograma")
+```
+* Podemos observar em termo de Dissimilaridade a divisão de grupos bem proximas.
+
+## Aplicando o K-means
+Com o intuito de busca grupos onde se encaixa os adversarios da seleção Brasileira podemos observar utilizando o algoritimo k-means e o Sillhoutte plot..
+
+* O algoritmo do K-Means pode ser descrito da seguinte maneira:
+    + 1: Escolher k distintos valores para centros dos grupos (possivelmente, de forma aleatória)
+    + 2: Associar cada ponto ao centro mais próximo
+    + 3: Recalcular o centro de cada grupo
+    + 4: Repetir os passos 2-3 até nenhum elemento mudar de grupo.
+
+* Sillhoutte plot:
+    + Silhouette refere-se a um método de interpretação e validação de consistência dentro de grupo de dados . A técnica fornece uma representação gráfica sucinta de           quão bem cada objeto está dentro de seu grupo.
+    + A silhueta pode ser calculada com qualquer métrica de distância , como a distância euclidiana ou a distância de Manhattan . 
+    + Para esta analise utilizamos a distância euclidiana.
+
+
+```{r message=FALSE}
+historico_t = historicos %>% 
+    mutate(jogos = log10(jogos)) 
+
+atribuicoes = tibble(k = 1:6) %>% 
+    group_by(k) %>% 
+    do(kmeans(select(historico_t,ganhou, jogos), 
+              centers = .$k, 
+              nstart = 10) %>% augment(historico_t)) # alterne entre filmes e filmes_t no augment  
+
+atribuicoes_long = atribuicoes %>% 
+    gather(key = "variavel", value = "valor", -time2, -k, -.cluster, -jogos) 
+
+atribuicoes %>%
+    ggplot(aes(x = ganhou, y = jogos, label = time2, colour = .cluster)) + 
+    geom_point() + 
+    facet_wrap(~ k) + scale_y_log10()
+
+# A silhoueta
+dists = select(historico_t, ganhou, jogos) %>% dist()
+set.seed(31)
+km = kmeans(select(historico_t, ganhou, jogos), 
+            centers = 4, 
+            nstart = 10) 
+
+silhouette(km$cluster, dists) %>% 
+    plot(col = RColorBrewer::brewer.pal(4, "Set2"))
+```
+
+* Considerando como variavel a quantidade jogos pela proporção de vitoria podemos analisar também que o times no intervalo 025 a 0.5 é times que o Brasil tende a empatar mais.
+* Podemos observar que a divisão em 4 grupo como a ideal.
+* Considerando o uso do k-means podemos verificar qual o melhor valor de k de acordo com o gráfico abaixo.
+
+```{r message=FALSE}
+set.seed(123)
+explorando_k = tibble(k = 1:15) %>% 
+    group_by(k) %>% 
+    do(
+        kmeans(select(historico_t, -time2), 
+               centers = .$k, 
+               nstart = 20) %>% glance()
+    )
+
+explorando_k %>% 
+    ggplot(aes(x = k, y = betweenss / totss)) + 
+    geom_line() + 
+    geom_point()
+```
+
+* Podemos observar que k está entre os valores 4 e 6.
+* Consideramos que á partir do valor 5 não ocorre uma mudança considerada na linha da curva então podemos considerar **k = 4**.
+
+* Organizando os dados segundo os grupos identificados:
+```{r}
+
+d.scaled.km.long = km %>%
+    augment(historico_t) %>%
+    gather(key = "variável", 
+           value = "valor", 
+           -time2, -.cluster)
+```
+
+```{r}
+d.scaled.km.long %>% 
+    ggplot(aes(x=`variável`, y=valor, group=time2, colour=.cluster)) + 
+    geom_line(alpha = .5) + 
+    facet_wrap(~ .cluster) 
+```
+
+* Vamos identificar esses grupos:
+    + O grupo 1 Observamos que é os "fregueses" do Brasil pós é as seleções que mais perderam para o Brasil.
+    + O grupo 2 Seleções que o  Brasil mais jogou e tem uma mesma proporção de vitorias e derrotas então é um grupo de seleções "meio a meio"
+    + O grupo 3 Observamos que é o grupo de seleções que o Brasil tem um número considerado de jogos e que a seleção teve bons resultados(vitorias).
+    + O grupo 4 Observamos que é um grupo pequeno de seleções onde temos um valor considerado de partidas empatadas. 
+                

@@ -1,0 +1,357 @@
+---
+title: "Tipos de filme de Johnny Deep"
+output:
+    html_document:
+    df_print: paged
+theme: sandstone
+author: "Vinicius Brandão Araújo"
+date: 25/06/2018
+---
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(plotly)
+library(here)
+library(cluster)
+library(ggdendro)
+
+
+source(here::here("code/lib.R"))
+source(here::here("code/plota_solucoes_hclust.R"))
+theme_set(theme_bw())
+
+knitr::opts_chunk$set(tidy = FALSE,
+                      fig.width = 6,
+                      fig.height = 5,
+                      echo = TRUE)
+
+paleta = c("#404E4D",
+           "#92DCE5",
+           "#938BA1",
+           "#2D3142",
+           "#F4743B")
+```
+
+O intuito e analisar os filmes da carreira de Johnny Depp considerado dois fatores principais: Bilheteria e Avaliação.
+Á partir disto direcionamos a análise possíveis conjunto de grupo que os filmes de Johnny Deep pode se encaixar.
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+import_data("johnny_depp") 
+filmes = read_imported_data()
+```
+
+## Bilheteria
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+p <- filmes %>%
+    ggplot(aes(x = ano, 
+               y = bilheteria,
+               text = paste("Filme:",filme,
+                            "\nBilheteria:",
+                            bilheteria,"m",
+                            "\nAno:",ano))) + 
+    geom_point(size = 4, color = paleta[2]) +
+    labs(y = "Bilheteria", x = "Ano de lançamento")
+
+ggplotly(p, tooltip = "text") %>%
+    layout(autosize = F)
+```
+* Entre os filmes em que Johnny atuou o que se destaca na bilheteria é "Piratas do Caribe: O Baú da Morte" lançado em 2006.
+* Observamos que os filems de Johnny que obtiveram uma bilheteria boa está entre 2005 e 2010. 
+* De 2010 até 2017 os filmes de Johnny se mantem em um mesmo intervalo de bilheteria sem grandes destaques. 
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+filmes %>% 
+    ggplot(aes(x = bilheteria)) + 
+    geom_histogram(aes(y=(..count..)/sum(..count..)),binwidth = 10, boundary = 0, 
+                   fill = "grey", color = "blue") + 
+    geom_rug(size = .5) +
+    scale_x_continuous(breaks=seq(0,500,50)) +
+    labs(y = "Frequência Relativa", x = "Bilheteria") 
+```
+
+* Podemos observar que a maioria dos filmes se encontra entre 0 e 100 milhões de dolares.
+* Observamos que o filme "Piratas do Caribe: O Baú da Morte" é o filme com a maior bilheteria disparado. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+p <- filmes %>% 
+    ggplot(aes(x = "",
+               y = bilheteria,
+               label = filme,
+               text = paste("Filme:",filme,
+                            "\nBilheteria:",
+                            bilheteria,"m"))) + 
+    geom_jitter(width = .05, alpha = .3, size = 3) + 
+    labs(x = "", y="Bilheteria")
+
+ggplotly(p, tooltip="text") %>% 
+    layout(autosize = F)
+```
+* Podemos observar que separar os grupo entre os acima e abaixo de 100 milhões como uma boa abordagem.
+* **Piratas do Caribe: O Baú da Morte** pode ficar em grupo só. Considerando assim 3 grupos de filmes.
+
+## Avaliação
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+p <- filmes %>% 
+    ggplot(aes(x = ano, 
+               y = avaliacao,
+                text = paste("Filme:",filme,
+                            "\nAvaliação:",
+                            avaliacao,
+                            "\nAno:",ano))) + 
+    geom_point(size = 4, color = paleta[2])  +
+    scale_y_continuous(limits = c(0, 100)) +
+    labs(y = "Avaliação", x = "Ano de lançamento")
+
+ggplotly(p, tooltip = "text") %>%
+    layout(autosize = F)
+```
+* Podemos observa que os filme de Johnny Deep em sua maioria são muito bem avaliados.
+* No periodo de 2005 e 2010 os filmes além de ter um ótima bilhetereia foram muito bem avaliados.
+* Observamos também que o filme **Piratas do Caribe: O Baú da Morte** não obteve uma avaliação muito boa já que foi o filme de maior bilheteria. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+filmes %>% 
+    ggplot(aes(x = avaliacao)) + 
+    geom_histogram(aes(y=(..count..)/sum(..count..)),binwidth = 10, boundary = 0, 
+                   fill = paleta[3], color = "blue") + 
+    geom_rug(size = .5) +
+    scale_x_continuous(breaks=seq(0,100,10)) +
+    labs(y = "Frequência Relativa", x = "Avaliação ")
+```
+* Observamos que a maioria dos filmes se encontra no intervalo de 80-90.
+* A maioria dos filmes se encontra com notas acima de 50. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+p <- filmes %>% 
+    ggplot(aes(x = "",
+               y = avaliacao,
+               text = paste(
+                    "Filme:",filme,
+                    "\nAvaliação:",avaliacao))) + 
+    geom_jitter(width = .05, alpha = .3, size = 3) + 
+    labs(x = "", y="Avaliação RT")
+
+ggplotly(p, tooltip = "text") %>% 
+    layout(autosize = F)
+```
+
+* Três grupos surgem:
+    +Os filmes com avaliação acima de 70
+    +Os filmes com avaliação entre 50 e 70
+    +Os filmes com avaliação abaixo de 50
+
+## Agrupamento hierárquico
+
+
+### Bilheteria 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+agrupamento_h = filmes %>% 
+    mutate(nome = paste0(filme, " (bil=", bilheteria, ")")) %>% 
+    as.data.frame() %>% 
+    column_to_rownames("filme") %>% 
+    select(bilheteria) %>%
+    dist(method = "euclidian") %>% 
+    hclust(method = "centroid")
+
+ggdendrogram(agrupamento_h, rotate = T, size = 2, theme_dendro = F) +
+    labs(y = "Dissimilaridade", x = "", title = "Dendrograma") +
+    geom_hline(aes(yintercept = c(20,30), color=c("4 grupos","3 grupos"))) +
+    scale_colour_manual(name="#Grupos",
+    values=c("#56B4E9", "#FF9999"))
+```
+
+* Em termos de Dendograma a divisão em quatro grupos assim como a divisão em 3 grupos parecem ser apropriadas, dado que o aumento de dissimilaridade de 4 para 3 grupos não aparentar ser substancial.
+* Corte feito para 4 grupos.
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+atribuicoes = get_grupos(agrupamento_h, num_grupos = 1:6)
+
+atribuicoes = atribuicoes %>% 
+    left_join(filmes, by = c("label" = "filme"))
+
+atribuicoes %>% 
+    ggplot(aes(x = "Filmes", y = bilheteria, colour = grupo)) + 
+    geom_jitter(width = .02, height = 0, size = 1.6, alpha = .6) + 
+    facet_wrap(~ paste(k, " grupos")) + 
+    scale_color_brewer(palette = "Dark2") +
+    labs(y = "Bilheteria (milhões)", x = "", title = "Agrupamento por Bilheteria")
+
+
+```
+* Observamos que o corte em 4 grupo mais adequada.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+k_escolhido = 4
+
+m <- list(l = 220)
+
+p <-atribuicoes %>% 
+    filter(k == k_escolhido) %>% 
+    ggplot(aes(x = reorder(label, bilheteria),
+               y = bilheteria,
+               colour = grupo,
+               text = paste(
+                    "Filme:", reorder(label, bilheteria),
+                    "\nAvaliação:", bilheteria,
+                    "\nGrupo:", grupo))) + 
+    geom_jitter(width = .02, height = 0, size = 3, alpha = .6) + 
+    facet_wrap(~ paste(k, " grupos")) + 
+    scale_color_brewer(palette = "Dark2") + 
+    labs(x = "", y = "Bilheteria") + 
+    coord_flip()
+
+ggplotly(p,tooltip = "text") %>%
+    layout(autosize = F, margin = m)
+```
+
+* Observamos que **Piratas do Caribe: O Baú da Morte* no quesito bilheteria ficou em um grupo só. 
+
+### Avaliação
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+agrupamento_h = filmes %>% 
+    mutate(nome = paste0(filme, " (av=", avaliacao, ")")) %>% 
+    as.data.frame() %>% 
+    column_to_rownames("filme") %>% 
+    select(avaliacao) %>%
+    dist(method = "euclidian") %>% 
+    hclust(method = "ward.D")
+
+ggdendrogram(agrupamento_h, rotate = T, size = 2, theme_dendro = F) +
+    labs(y = "Dissimilaridade", x = "", title = "Dendrograma") +
+    geom_hline(aes(yintercept = 30),color="red")
+```
+
+* Em termos de Dendograma a divisão em cinco grupos parece ser a mais apropriada.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+atribuicoes = get_grupos(agrupamento_h, num_grupos = 1:6)
+
+atribuicoes = atribuicoes %>% 
+    left_join(filmes, by = c("label" = "filme"))
+
+atribuicoes %>% 
+    ggplot(aes(x = "Filmes", y = avaliacao, colour = grupo)) + 
+    geom_jitter(width = .02, height = 0, size = 1.6, alpha = .6) + 
+    facet_wrap(~ paste(k, " grupos")) + 
+    scale_color_brewer(palette = "Dark2") +
+    labs(y = "Avaliação", x = "", title = "Agrupamento por Avaliação")
+```
+* Podemos observar que a divisão por 5 grupos como correta.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+k_escolhido = 5
+
+m <- list(l = 220)
+
+p <-atribuicoes %>% 
+    filter(k == k_escolhido) %>% 
+    ggplot(aes(x = reorder(label, avaliacao),
+               y = avaliacao,
+               colour = grupo,
+               text = paste(
+                    "Filme:", reorder(label, avaliacao),
+                    "\nAvaliação:", avaliacao,
+                    "\nGrupo:", grupo))) + 
+    geom_jitter(width = .02, height = 0, size = 5, alpha = .6) + 
+    facet_wrap(~ paste(k, " grupos")) + 
+    scale_color_brewer(palette = "Dark2") + 
+    labs(x = "", y = "Avaliação") + 
+    coord_flip()
+
+ggplotly(p,tooltip = "text") %>%
+    layout(autosize = F, margin = m)
+
+```
+* Podemos observar que em 5 grupos fica bem dividido em quesito de avaliação. 
+* Observamos que o grupo 4 é de filmes coma avaliações muito ruim.
+
+## Duas dimensões
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+agrupamento_h_2d = filmes %>%
+   mutate(bilheteria = log10(bilheteria)) %>%
+   mutate_at(vars("avaliacao", "bilheteria"), funs(scale)) %>%
+   column_to_rownames("filme") %>%
+   select("avaliacao", "bilheteria") %>%
+   dist(method = "euclidean") %>%
+   hclust(method = "ward.D")
+
+ggdendrogram(agrupamento_h_2d, rotate = TRUE, theme_dendro = F) +
+    labs(y = "Dissimilaridade", x = "", title = "Dendrograma") +
+    geom_hline(aes(yintercept = 4),color="red")
+```
+* Considerando que 4 grupos á 5 como correto de acordo com termos de dendrograma.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+filmes2 <- filmes %>%
+    mutate(bilheteria = log10(bilheteria))
+
+plota_hclusts_2d(agrupamento_h_2d,
+                filmes2,
+                c("avaliacao", "bilheteria"),
+                linkage_method = "ward.D", 
+                ks = 1:6,
+                palette = "Dark2") + 
+    scale_y_log10() +
+    labs(y = "Bilheteria", x = "Avaliação", title = "Agrupamento com Duas Dimensões")
+```
+
+* A escolha por **6 grupo aparece com mais apropriada**, refletindo a questão de bilheteria e avaialção. Com isso temos:
+    + Os $\color{#16A085}{\text{11 filmes de melhores avaliações e altíssima bilheteria}}$ estão bem próximos uns dos outros e sugerem um grupo.
+    + Os $\color{#CF5300}{\text{6 filmes de altíssima bilheterias e baixas avaliações}}$ estão bem distantes do resto dos filmes e sugerem um grupo.
+    + Os $\color{#6633FF}{\text{3 filmes de baixas bilheterias e baixas avaliações}}$ estão bem distantes do resto dos filmes e sugerem um grupo.
+    + Os $\color{magenta}{\text{4 filmes de media bilheteria e avaliações media}}$ estão bem próximos uns dos outros e sugerem um grupo.
+    + Os $\color{green}{\text{3 filmes de altíssima bilheteria e media avaliações}}$ estão bem próximos uns dos outros e sugerem um grupo.
+    + Os $\color{#FFCC66}{\text{2 filmes de baixas bilheteria e altíssima avaliação}}$ estão bem distantes do resto dos filmes e sugerem um grupo.
+    
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+atribuicoes = get_grupos(agrupamento_h_2d, num_grupos = 1:6)
+
+atribuicoes = atribuicoes %>% 
+    filter(k == 6) %>%
+    mutate(filme = label) %>% 
+    left_join(filmes, by = "filme")
+
+p <- atribuicoes %>%
+    ggplot(aes(x = avaliacao,
+               y = bilheteria,
+               colour = grupo,
+               text = paste(
+                    "Filme:", filme,
+                    "\nBilheteria:", bilheteria,"m\n",
+                    "Avaliação:", avaliacao))) + 
+    geom_jitter(width = .02, height = 0, size = 3, alpha = .6) + 
+    facet_wrap(~ paste(k, " grupos")) + 
+    scale_color_brewer(palette = "Dark2") +
+    scale_y_log10() +
+    labs(y = "Bilheteria", x = "Avaliação")
+
+
+ggplotly(p, tooltip = "text") %>%
+    layout(autosize = F)
+```
+
+
+* $\color{#16A085}{\text{Grupo 1 (Sucesso de carreira):}}$ Filmes, em geral, bem recebidos pela crítica e bem recebidos pelo público, o que se reflete um sucesso.
+    + **Pirates of the Caribbean: The Curse of the Black Pearl:** O primeiro filme da franquia considerada o melhor já lançado, vale considerar que a franquia do Piratas do Caribe pertencente a Disney como um grande reforço para a carreira de Johnny Depp, vale considerar que nesse grupo está presente Deep Sea 3D como um grande documentário com a tecnologia 3D que agradou muito os críticos e bilheteria onde Johnny Depp fazia a narração.
+
+* $\color{#CF5300}{\text{Grupo 2 (Corrujão):}}$ Filmes, em geral, não tão bem recebidos pela crítica, mas bem recebido pelo público em quisito de bilheteria.
+    + **The Tourist:** Um dos piores filmes da carreira de Johnny Deep vale considerar o valor da bilheteria ser um pouco alto pelo grande midia que foi criada em cima do filme pós tinha como atriz Angeline Jolie e o proprio Johnny Deep dois atores de sucesso de Hollywood.
+
+* $\color{#6633FF}{\text{Grupo 3 (Fim de carreira):}}$ Filmes não tão bem recebidos pela crítica e de baixo faturamento.
+    + **Mortdecai:** O pior filme da carreira de Johnny Deep, muito se refere que o ator teve uma postura "egocêntrica" e acabou não realizando o papel de uma forma coerente e o filme acabou não agradando a ninguem considerado uma pessima atuação.
+
+* $\color{magenta}{\text{Grupo 4 (Mais ou Menos):}}$ Filmes recebidos pela crítica e de medio faturamento.
+    + **Secret Window:** Filme não foi nem bom nem ruim, pelos críticos podemos considerar um filme mediano e que não teve um bilheteria muito alta dado que esse filme foi lançado em 2004 onde podemos considerar que a carreira de Johnny Deep começava a ser conhecida por Hollywood.
+
+* $\color{green}{\text{Grupo 5 (UPDisney):}}$ Filme que pouco agradaram os críticos (Mais ou menos), porém, tiveram uma ótima bilheteria. Todos os filmes pertecem a Disney.
+    + **Pirates of the Caribbean: Dead Man's Chest:** Podemos associar a esse filme a ótima repercurssão que o filme anterior da franquia teve causando no público, em geral, uma grande ansiedade para vê a continuação na minha opinião um dos fatores que contribui é que a Disney investe muito em marketing para os seus filmes onde atrai consideravelmente o público, em geral.
+
+*  $\color{#FFCC66}{\text{Grupo 6 (Sucesso desconhecido):}}$ Filmes de baixo faturamente, mas que foram bem recebidos pela crítica.
+    + **Gonzo: The Life and Work of Hunter S. Thompson:** Trata-se de um Documentário sobre a vida de Hunter S. Thompson, criador do "Gonzo Journalism", jornalismo bizarro e fictício, assim considero que não teve tanto sucesso por ser um documentário com uma caracteristica retrantando uma história que não é muito do gosto do público, em geral
