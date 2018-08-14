@@ -1,0 +1,77 @@
+---
+title: 'Regressão Logística e match - speed dating'
+author: "Vinicius Brandão Araújo"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+```{r}
+library(tidyverse)
+library(here)
+library(broom)
+library(modelr)
+library(grid)
+library(gridExtra)
+library(pscl)
+```
+
+
+## Objetivo da analise 
+Esta análise, realizada no contexto da disciplina Ciência de Dados 1, tem por objetivo analisar os dados que serão utilizados são referentes a encontros rápidos, também chamados de "speed dating". Nesse tipo de encontro, diversas pessoas irão se conhecer, sendo cada par é sugerido por um sistema que foi alimentado com informações de cada participante e julga que aquele encontro deve acontecer. Após cada encontro, os participantes envolvidos deveriam preencher fichas avaliando a outra pessoa, com base em diversos critérios. Com isso, o conjunto de dados formado será analisado e perguntas envolvendo cada uma das variáveis foram elaboradas e serão respondidas neste relatório.
+
+## Principais Perguntas de analise
++  Dentre os fatores que você acha que podem ter efeito no match, quais fatores têm efeito significativo na chance de p1 decidir se encontrar novamente com p2? E como é esse efeito (positivo/negativo)?
++ Que fatores nos dados têm mais efeito na chance de um participante querer se encontrar novamente com outro?
+
+
+## Sobre os dados
+
+Diversas varíaveis compõem o conjuno de dados. As informações detalhadas sobre cada uma delas pode ser vista [aqui](https://github.com/nazareno/ciencia-de-dados-1/tree/master/5-regressao/speed-dating).
+```{r}
+dados = na.omit(read.csv(here("data/speed-dating2.csv")))
+```
+Para essa analise teremos um atributo a mais referente a:
++ **dec**: p1 gostaria de se encontrar novamente com p2 dado como foi o encontro relâmpago.
+### Dentre os fatores que você acha que podem ter efeito no match, quais fatores têm efeito significativo na chance de p1 decidir se encontrar novamente com p2? E como é esse efeito (positivo/negativo)?
+
+Para responder a esta pergunta podemos escolher as variáveis que podem exercer um efeito significativo em dec. Escolhemos, então, as variáveis **attr, fun, shar**, que irá nos dizer o quanto a primeira pessoa considera a segunda atraente, divertida, quanto a pessoa pensa que compartilha interesses com a segunda pessoa - respectivamente.
+Demostrando o modelo escolhido temos. 
+
+```{r}
+modelo <- glm(dec ~ attr + fun  + shar, 
+         data = dados,
+         family = "binomial")
+```
+Podemos observar os valores estimados dos coeficientes de cada variável, assim como foi feito no checkpoint anterior. Entretanto, realizamos a exponenciação dos resultados de modo a observar melhor os coeficientes, uma vez que se adequa melhor a forma com a qual o modelo de regressão logística foi construído.
+
+```{r}
+tidy(modelo, conf.int = TRUE, exponentiate = TRUE)
+```
+Observamos de acordo com o intervalo de confiança de **attr,fun e shar** como consideraveis para a variaveil **dec** , sendo assim podemos considerar essas três variaveis para o modelo e pelos valores temos que essas variaveis irão implicar em um efeito positivo sobre dec. 
+
+```{r}
+pR2(modelo)
+```
+A regressão logística não permite que tenhamos um R² para entender melhor o modelo gerado. Entretanto, podemos utilizar um pseudo R² para o nosso modelo. Escolhendo a medida de McFadden podemos ter um estimador para indicar quâo bem nosso modelo consegue explicar os matchs, e vemos que o valor obtido ficou em torno de 24%.
+
+### Que fatores nos dados têm mais efeito na chance de um participante querer se encontrar novamente com outro?
+
+Podemos considerar o mesmo modelo trabalhado anteriormente dado que nenhuma variável escolhida demostrou comportamento contrario a observação e sem causar efeitos colaterais ao modelo, portanto:
+
+```{r}
+modelo <- glm(dec ~ attr + fun  + shar, 
+         data = dados,
+         family = "binomial")
+
+tidy(modelo, conf.int = TRUE, exponentiate = TRUE)
+```
+
+Considerando que todos os fatores selecionados exercem uma influência positiva sobre dec, podemos observar que para esse modelo attr aumenta muito mais a chance com que uma pessoa queira se encontrar novamente com a outra, se compararmos com as variáveis fun e shar.
+
+```{r}
+pR2(modelo)
+```
+
+Como o modelo não teve uma mudança os valores permanece os mesmo para a observação e assim dado o que foi mostrado as variareis escolhidas tem um efeito significativo para que ocorra um novo encontro.

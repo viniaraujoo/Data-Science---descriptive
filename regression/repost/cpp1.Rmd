@@ -1,0 +1,69 @@
+---
+title: 'Regressão - speed dating'
+author: "Vinicius Brandão Araújo"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r}
+library(tidyverse)
+library(here)
+library(broom)
+library(modelr)
+library(grid)
+library(gridExtra)
+```
+
+## Objetivo da analise 
+Esta análise, realizada no contexto da disciplina Ciência de Dados 1, tem por objetivo analisar os dados que serão utilizados são referentes a encontros rápidos, também chamados de "speed dating". Nesse tipo de encontro, diversas pessoas irão se conhecer, sendo cada par é sugerido por um sistema que foi alimentado com informações de cada participante e julga que aquele encontro deve acontecer. Após cada encontro, os participantes envolvidos deveriam preencher fichas avaliando a outra pessoa, com base em diversos critérios. Com isso, o conjunto de dados formado será analisado e perguntas envolvendo cada uma das variáveis foram elaboradas e serão respondidas neste relatório.
+
+## Sobre os dados
+
+Diversas varíaveis compõem o conjuno de dados. As informações detalhadas sobre cada uma delas pode ser vista [aqui](https://github.com/nazareno/ciencia-de-dados-1/tree/master/5-regressao/speed-dating).
+```{r}
+dados = na.omit(read.csv("https://raw.githubusercontent.com/nazareno/ciencia-de-dados-1/master/5-regressao/speed-dating/speed-dating.csv"))
+```
+
+
+## O que causa atração à primeira vista?
+Para está pergunta consideramos que um encontro de 2 minutos entre os participantes, e assim algum aspectos são importante para atrai uma pessoa a primeira vista seria:
+
++  fun : quão divertido p1 achou p2
++  attr : quão atraente p1 achou p2
++  shar : quanto p1 achou que compartilha interesses e hobbies com p2
+
+Diante dessas caracteristicas escolhidas iremos observa o quanto ela podem está relacionada com like : no geral, quanto p1 gostou de p2, e assim podemos analisar diante das caracteristicas escolhidas a relação final se p1 gostou de p2.
+Para isso observamos o comportamento dessas caracteristicas em relação a like, a baixo:
+```{r}
+p1<-dados %>% 
+    ggplot(aes(x = fun, y = like)) + 
+    geom_count() 
+
+p2<-dados %>% 
+    ggplot(aes(x = attr, y = like)) + 
+    geom_count() 
+p3<-dados %>% 
+    ggplot(aes(x = shar, y = like)) + 
+    geom_count() 
+
+grid.arrange(p1, p2,p3, nrow = 1)
+    
+```
+
+Como podemos observar o comportamento dos gráfico em relação as caracteristicas com like é bem parecido, não tivemos uma variação visualmente considerada, mas como sabemos tirar conclusões apenas do que podemos observar pode gerar contradições e para melhorar nossa analise iremos utilizar:
+
++ **regressão linear**: É uma equação para se estimar a condicional (valor esperado) de uma variável y, dados os valores de algumas outras variáveis x.A regressão, em geral, tem como objectivo tratar de um valor que não se consegue estimar inicialmente.
+```{r}
+modelo = lm(like ~ fun + shar + attr, data = dados)
+
+tidy(modelo, conf.int = TRUE)
+```
+
+```{r}
+glance(modelo)
+```
+A tabela acima nos mostra os resultados do modelo gerado.
+A coluna estimate pode nos mostrar informações sobre a magnitude dos coeficientes: isso nos indica o quanto cada uma das variáveis independentes estão influenciando no like.Como podemos observar o valor os valores para as variaveis fun, shar e attr estão bem parecido e se consideramos o intervalo de confiança é bem baixo algo entre 0.2 e 0.3 para fun e shar e 0.33 - 0.44 para attr sendo assim para está analise podemos observar baseado na regressão lienar com 65% (baseado no r quadrado) que as variaveis fun, shar e attr não tem uma relação tão forte para considerar uma pessoa atraente baseado apenas nesses atributos. Lembrando que uma pessoa atraente está relacionado com a pessoa gostar(like). 
+
+

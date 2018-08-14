@@ -1,0 +1,84 @@
+---
+title: "Testes de hipótese x ICs"
+author: "Vinicius Brandão Araújo"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+library(here)
+library(tidyverse)
+library(lubridate)
+library(timeDate)
+library(resample)
+
+theme_set(theme_bw())
+```
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+readr::read_csv(here::here("data/github-users-committing-filetypes.csv"),
+                      progress = FALSE,
+                      col_types = cols(
+                        file_extension = col_character(),
+                        month_day = col_integer(),
+                        the_month = col_integer(),
+                        the_year = col_integer(),
+                        users = col_integer()
+                        )) -> data
+data %>% 
+  glimpse()
+```
+
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+dados.github.summ <- data %>%
+  unite("date", the_year, the_month, month_day, sep = "-") %>%
+  mutate(date = as.Date(strptime(date, "%Y-%m-%d"))) %>%
+  group_by(date) %>%
+  summarise(total = sum(users))
+```
+
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+dados.github.summ <- dados.github.summ %>%
+  mutate(day_of_week = wday(date))
+
+dados.github.extr <- dados.github.summ %>%
+  filter(!day_of_week %in% c(1, 7)) %>%
+  mutate(isEXT = day_of_week %in% c(2, 6))
+```
+
+
+## Objetivo da analise.
+Esta análise, realizada no contexto da disciplina Ciência de Dados 1, tem por objetivo avaliar a popularidade de linguagens de programação no período entre 2016 e 2017 segundo dados registrados no GitHub. Essa análise serve de mote para trabalharmos Testes de hipótese x ICs.
+
+## Pergunta a ser respondida:
+* Segunda e sexta têm popularidade menor que terça, quarta e quinta?
+
+Para responder essa pergunta iremos utilizar testes de hipótese, para isso, iremos utilizar uma Hipótese nula e p-valor.
+
+**Hipótese nula (H0):** Neste caso seria uma hipotese de não existe dirferença entre os dias segunda e sexta com terça,quarta e quinta.
+
+**p-valor:** É a probabilidade de que a estatística do teste (como variável aleatória) tenha valor extremo em relação ao valor observado (estatística) quando a hipótese H0 é verdadeira. Em outras palavras, qual a chance de que se uma amostra aleatória que ignorasse o pareamento entre os dados fosse gerada se a mesma geraria a mesma estatística que na amostra observada. 
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+dados.github.p <- dados.github.extr %>%
+  select(c(isEXT, total))
+```
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+permutationTest2(dados.github.p, median(total), treatment = isEXT)$stats %>% t()
+```
+Podemos observar o valor do p-valor para a diferença entre a mediana dos dois grupos(Segunda e Sexta / Terça, Quarta e Quinta), como observamos o valor é baixo e assim podemos considerar que existe uma diferença significativa entre os grupos.O p-valor não nos permite afirmar qual o intervalo que contêm essa diferença e qual o nível de confiança que temos no intervalo, já no intervalo de confiança podemos obter esse intervalo.
+
+
+### Testes de hipótese x ICs
+Aplicando ICs e dado que existe uma diferença significativa entre os grupos assim como o Teste de hipótese também retornou baseado no p-valor. Sendo assim ambos os mecanismos nos retornou a mesma resposta, porém vale lembra que o teste de hipótese nos deixa com pouca informação já que o ICs nos fornece nível de confiança que temos no intervalo e o valores do intervalo, nos deixando com mais artifícios sobre a análise.
+
+
+
+
+
+

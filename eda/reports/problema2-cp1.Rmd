@@ -1,0 +1,57 @@
+---
+title: "Qual á série mais 'queridinha' do publico."
+author: "Vinicius Brandão"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+
+```{r echo=FALSE,warning=FALSE, message=FALSE}
+library(tidyverse)
+library(here)
+library(plotly)
+```
+
+```{r echo=FALSE}
+dados <- read_csv(here("data/series_from_imdb.csv"), 
+                    progress = FALSE,
+                    col_types = cols(.default = col_double(), 
+                                     series_name = col_character(), 
+                                     episode = col_character(), 
+                                     url = col_character(),
+                                     season = col_character()))
+    
+```
+
+
+```{r echo=FALSE}
+    dados_escolhidos <- dados %>% 
+    filter(series_name %in% c("The Blacklist",
+                              "House of Cards",
+                              "Vikings"))
+    
+```
+
+Analisamos as séries The Blaclist, Vikings e House of Cards com o intuito de demostrar os episódios mais bem avaliados, com isso demostrar qual é os episódios mais bem avaliados, sua nota, série que pertence e a quantidade de votos recebidos pelos usuários.
+
+```{r echo=FALSE,warning=FALSE, message=FALSE}
+dados_escolhidos %>%
+  arrange(-user_rating) %>%
+  plot_ly(x = ~user_rating,
+             y = ~user_votes,
+             color = ~series_name,
+             size = ~user_votes,
+            text = ~paste("Pontuação Episódio:", user_rating,
+                          "\nEpisódio:",season_ep,
+                           "\nTemporada:",season,
+                          "\nQuantidade de votos dos úsuarios:",user_votes))  
+
+  
+```
+
+Como podemos observar, á série *House of Cards* possui os episódios mais bem votados do conjunto com a nota 9,6 no, mas podemos destacar o episódio 1 da 2 temporada que foi o mais bem votado pelo usuarios e também o que recebeu a maior nota.
+Destaca-se também a série The Blacklist que seus episódios não são muito avaliados por usuários como a outras séries, ficando em sua maioria entre 200 a 1100 votos.
+Concluímos que a série House of Cards a mais bem avaliada pelo público  também é a série que possui mais votos dos úsuarios, com isso podemos dizer que perante as outras séries analisadas *House of Cards é a série mais "queridinha" do público*.
+

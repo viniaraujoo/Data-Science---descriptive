@@ -1,0 +1,192 @@
+---
+title: "Dados de commits no github"
+author: "Vinicius Brandão Araújo"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+library(here)
+library(tidyverse)
+library(lubridate)
+library(timeDate)
+library(resample)
+library(xts)
+library(highcharter)
+
+theme_set(theme_bw())
+```
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+readr::read_csv(here::here("data/github-users-committing-filetypes.csv"),
+                      progress = FALSE,
+                      col_types = cols(
+                        file_extension = col_character(),
+                        month_day = col_integer(),
+                        the_month = col_integer(),
+                        the_year = col_integer(),
+                        users = col_integer()
+                        )) -> data
+data %>% 
+  glimpse()
+```
+
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+dados.github.summ <- data %>%
+  unite("date", the_year, the_month, month_day, sep = "-") %>%
+  mutate(date = as.Date(strptime(date, "%Y-%m-%d"))) %>%
+  group_by(date) %>%
+  summarise(total = sum(users))
+
+```
+
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+dados.summ.stock <- dados.github.summ %>%
+  remove_rownames %>% 
+  column_to_rownames(var="date")
+
+dados.summ.stock.xts <- as.xts(dados.summ.stock)
+```
+
+## Objetivo da analise.
+Esta análise, realizada no contexto da disciplina Ciência de Dados 1, tem por objetivo avaliar a popularidade de linguagens de programação no período entre 2016 e 2017 segundo dados registrados no GitHub. Essa análise serve de mote para trabalharmos conceitos de inferência, intervalos de confiança, significância, entre outros.
+
+
+## Perguntas a ser respondidas:
+* Segunda e sexta têm popularidade menor que terça, quarta e quinta?
+* Qual trimestre do ano com a maior movimentação no github?
+
+## Conhecendo os dados.
+Usaremos uma amostra de dados que contém informações sobre quantos usuários fizeram atividade no GitHub.
+Abaixo podemos observar a distribuição das atividade global no GitHub.
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+highchart(type = "stock") %>% 
+  hc_title(text = "Atividade Global no Github") %>% 
+  hc_subtitle(text = "Número de usuários que editaram arquivos no github") %>% 
+  hc_add_series(dados.summ.stock.xts, id = "git", name = "Git") 
+```
+
+### Segunda e sexta têm popularidade menor que terça, quarta e quinta?
+Para responder essa pergunta iremos considerar apenas os dias da semana e dividir em dois grupos, o grupo de terça á quinta e de segunda á sexta.
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+dados.github.summ <- dados.github.summ %>%
+  mutate(day_of_week = wday(date))
+
+dados.github.extr <- dados.github.summ %>%
+  filter(!day_of_week %in% c(1, 7)) %>%
+  mutate(isEXT = day_of_week %in% c(2, 6))
+```
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+set.seed(123)
+dados.github.extr %>%
+  ggplot(aes(x = isEXT, y = total)) +
+  geom_jitter(width = .1, color = "blue") +
+  labs(title = "Atividade de usuários na Segunda e Sexta e em outros dias da semana", x = "Dias da semana", y = "Usuários") +
+  scale_x_discrete(labels= c("Terça, quarta, quinta", "Segunda, sexta")) +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Não conseguimos enchergar uma diferença clara entre os dois grupos, observamos que segunda e sexta tem um numero considerado de atividade, mas não podemos concluir por esse meio visual.Para isso usaremos bootstrap e intervalo de confiança.
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+median.dados.extr <- bootstrap2(dados.github.extr$total,
+                          treatment = dados.github.extr$isEXT,
+                          median,
+                          R = 30000)
+
+median.dados.extr.ci <- CI.percentile(median.dados.extr, probs = c(.025, .975))
+
+data.frame(median.dados.extr.ci) %>% 
+  ggplot() + 
+  geom_errorbar(aes(x = "Diferença", ymin = X2.5., ymax = X97.5.), width = .2) + 
+  geom_hline(yintercept = 0, colour = "darkorange")
+```
+
+Com 95% de confiança podemos observar que existe uma diferença entre esses dois grupos, baseado nas amostras (utilizando bootstrap), e está diferença tem um intervalo positivo grande, sendo assim a diferença entre Segunda e Sexta e os demais dias da semana é relevante. Podemos associar que segunda e sexta são os pontos extremos da semana e com isso o dias do "meio da semana" como mais produtivos.
+Com intervalo de confiança, além de conseguirmos identificar se existe diferença das medianas também podemos identificar o intervalo dessa diferença. Ou seja, aplicando essa técnica temos o poder de mensurar o quão relevante é a diferença e não apenas se ela existe ou não.
+
+#### Existe diferença na popularidade entre Segunda e Sexta?
+Para responder essa pergunta, iremos considerar apenas segunda e sexta na base de dados.
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+dados.github.segsex <- dados.github.summ %>%
+  filter(day_of_week %in% c(2, 6)) %>%
+  mutate(isSEX = day_of_week %in% c(6))
+```
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+set.seed(123)
+dados.github.segsex %>%
+  ggplot(aes(x = isSEX, y = total)) +
+  geom_jitter(width = .1, color = "#488888") +
+  labs(title = "Atividade de usuários na Sexta e na Segunda", x = "Dia da semana", y = "Usuários") +
+  scale_x_discrete(labels= c("Segunda", "Sexta")) +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Como podemos observar não existe uma diferença significativa entre os dois dias, mas não podemos concluir baseado apenas nesta visualização. 
+Para exemplificar melhor, utilizamos bootstrap e intervalo de confiança para chegar a uma conclusão.
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+median.dados.segsex <- bootstrap2(dados.github.segsex$total,
+                          treatment = dados.github.segsex$isSEX,
+                          median,
+                          R = 30000)
+
+median.dados.segsex.ci <- CI.percentile(median.dados.segsex, probs = c(.025, .975))
+
+data.frame(median.dados.segsex.ci) %>% 
+  ggplot() + 
+  geom_errorbar(aes(x = "Diferença", ymin = X2.5., ymax = X97.5.), width = .2) + 
+  geom_hline(yintercept = 0, colour = "darkorange")
+```
+
+Com 95% de confiança temos o intervalo da diferença mediana entre os dois grupos está no intervalo r median.dados.segsex.ci. Percebemos que o 0 está contido no intervalo e assim consideramos que ou não existe diferença ou essa diferença é 0, assim temos que não podemos concluir sobre a diferença da popularidade entre os dois dias.
+
+### Período de Ferias(Julho, Dezembro) as atividade do GitHub Cai? 
+Para responder essa pergunta separamos em dois conjuntos, tomando como referencia de ferias os meses de Julho e Dezembro.
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+dados.github.summ <- data %>%
+  unite("date", the_year, the_month, month_day, sep = "-") %>%
+  mutate(date = as.Date(strptime(date, "%Y-%m-%d"))) %>%
+  group_by(date) %>%
+  summarise(total = sum(users))
+dados.github.vocations <- dados.github.summ %>%
+  mutate(ferias = month(as.POSIXlt(date, format="%Y-%m-%d")) %in% c(7,12))
+
+```
+
+
+```{r}
+set.seed(123)
+dados.github.vocations %>%
+  ggplot(aes(x = ferias, y = total)) +
+  geom_jitter(width = .1, color = "#488888") +
+  labs(title = "Atividade de usuários", x = "Meses", y = "Usuarios") +
+  scale_x_discrete(labels= c("Não Ferias", "Ferias")) +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Como podemos observar acima não tem como definir uma queda em relação ao numero de usuarios nos meses de Dezembro e Julho, mas como sabemos não podemos definir isto como uma conclusão baseada nesta visualização, para melhorar a observação iremos utilizar bootstrap e intervalo de confiança para chegar a uma conclusão.
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+median.dados.vocations <- bootstrap2(dados.github.vocations$total,
+                          treatment = dados.github.vocations$ferias,
+                          median,
+                          R = 30000)
+
+median.dados.vocations.ci <- CI.percentile(median.dados.vocations, probs = c(.025, .975))
+
+data.frame(median.dados.vocations.ci) %>% 
+  ggplot() + 
+  geom_errorbar(aes(x = "Diferença", ymin = X2.5., ymax = X97.5.), width = .2) + 
+  geom_hline(yintercept = 0, colour = "darkorange")
+```
+
+Com 95 % de confiança o intervalo da diferença mediana entre os dois grupos está no intervalo r median.dados.vocations.ci. Observamos que o intervalo é positivo e grande e assim podemos considerar que existe uma diferença considerada em relação as atividades do mês de Julho-Dezembro com os outros meses do ano. 

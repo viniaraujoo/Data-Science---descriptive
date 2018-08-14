@@ -1,0 +1,223 @@
+---
+title: "problema1-cp1"
+author: "Vinicius Brandão"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_float: yes
+  html_notebook:
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+---
+
+```{r setup, echo=FALSE, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(here)
+theme_set(theme_bw())
+```
+
+## Conjunto de dados utilizado
+
+Análise exploratória de dados do [IMDB](https://www.imdb.com/)  sobre seriados de TV e Streaming. Os dados originais e as variáveis vem de [neste repositorio](https://github.com/nazareno/imdb-series) . Lá tem a explicação de como os dados foram gerados e do significado de cada variável.
+
+```{r}
+dados <- read_csv(here("data/series_from_imdb.csv"), 
+                    progress = FALSE,
+                    col_types = cols(.default = col_double(), 
+                                     series_name = col_character(), 
+                                     episode = col_character(), 
+                                     url = col_character(),
+                                     season = col_character()))
+    
+```
+
+## Conjunto de dados de analise
+Diante do conjunto de dados coletados, onde contem dados sobre algumas séries populares na atualidade.
+Na análise desse notebook foram escolhidas 3 série bastante popular atualmente, são elas:
+
+* The Blacklist
+* House of Cards
+* Vikings
+
+
+```{r}
+    dados_escolhidos <- dados %>% 
+    filter(series_name %in% c("The Blacklist",
+                              "House of Cards",
+                              "Vikings"))
+    
+```
+
+## Primeira pergunta 
+Analisaremos o quão bem avaliada as séres no [IMDB](https://www.imdb.com/)  e desse modo tentar a chegar a uma aproximação de qual serie diante do conjunto escolhido seria a mais bem avaliada de acordo com os votos dos usuarios.
+
+```{r}
+    dados_escolhidos %>%
+    ggplot(aes(user_rating)) +
+    geom_histogram(binwidth = .1, fill = 'chocolate1') + 
+    scale_x_continuous(breaks = seq(7,10,0.5)) +
+    labs(y = "Número de ocorrências", x = "Ratings dos usuários")
+```
+
+Para conhecer o conjunto de dados consideramos o histograma acima para examinar as pontuações que os episódios receberam, como está descrito verificamos o número de ocorrências, ou seja, o número de episódios que receberam determinadas notas, colocou uma diferença de 1 decimo pela aproximação em que as notas se encontra. Em relação à distribuição das notas podemos observa que em sua maior parte está distribuídas entre 8,0 e 9,0.
+
+
+```{r}
+    dados_escolhidos %>% 
+    ggplot(aes(x= series_name,
+               y = user_rating,
+               color=series_name)) +
+    geom_boxplot(width = .5,
+                 outlier.color = NA) + 
+    geom_jitter(width = 0.2) +
+    labs(y = "Ratings dos usuários", x = "Séries Escolhidas")
+        
+    
+```
+
+De acordo com o gráfico acima podemos observa que House of Cards tem melhor avaliação se observarmos a mediana dos votos.
+Podemos observa neste gráfico que concentração de notas de House of Cards em sua maioria superior a 8,5 algo que não observamos nas outras séries avaliadas.
+As demais séries verificamos uma diferença pequena em relação às médias.
+
+Notamos que The Blacklist possui um número um pouco superior de episódios, e verificamos também que existe dados discrepantes com nota igual a 7.
+
+
+```{r}
+sum <- dados_escolhidos %>% 
+    group_by(series_name) %>% 
+    summarise(n_episodios = n(),
+              media = mean(user_rating), 
+              mediana =  median(user_rating))
+
+ggplot(data = sum,aes(x = series_name)) +
+    geom_point(aes(x = series_name, y = media, color = "Média")) +
+    geom_point(aes(x = series_name, y = mediana, color = "Mediana"))
+
+
+```
+
+Podemos observar que os valores da média e da mediana como valores muito próximo, significando que ambos são representativos para os dados.
+
+
+## Mudanças de acordo com as temporadas.
+Analisaremos de acordo com as temporadas das séries se ocorreu mudanças siginificativas na avaliação de seus episódios.
+
+```{r}
+    dados_escolhidos %>% 
+    ggplot(aes(x = season_ep,
+               y = user_rating,
+               color = series_name))+
+    geom_jitter(width = 0.2) +
+    facet_grid(series_name ~ season) + 
+    labs(y = "Ratings dos usuários", x = "Numero de Episodio por Temporada")
+    
+```
+
+De acordo com gráfico acima observamos que a série The Blaclist possui uma variação de pontos atribuídos como podemos observar que na primeira temporada a pontuação atribuída se concentram em algo entre 8,0 e 9,0, porém , nas temporadas subsequente observamos que os que pontos vão diminuindo e na quarta temporada eles se dividem na metade ficando uma parte entre 7,0 e 8,0 desse modo verificamos que ao longo das temporadas ocorreu uma mudança considerável.
+Em relação à série Vikings enxergamos que existe uma diferença da primeira em relação á segunda temporada onde a concentração de pontos está entre 8,0 e 9,0 e mantendo nas temporadas subsequentes.
+A série House of Cards ao longo de suas temporadas mantêm sua concentração de pontos entre 8,0 e 9,0 e ao longo das temporadas subsequentes verificamos que o número de episódios avaliados acima de 9,0 aumenta.
+Diante disso, verificamos que às três séries se mantêm no intervalo de 8,0 e 9,0 na avaliação atribuída a seus episódios á partir disto verificamos que os episódios são bem avaliados em sua maioria.
+
+```{r}
+dados_escolhidos %>%
+    group_by(series_name,
+             season) %>%
+    summarise(media = mean(user_rating)) %>%
+    ggplot(aes(x = season, 
+               y = media, 
+               color = series_name)) +
+    geom_point()+
+    labs(y = "Media", x = "Temporada")
+    
+```
+
+Como podemos observar no gráfico acima, verificamos que na 1 temporada a série Vikigs possuía uma média menor entre às duas outras séries, mas como mostrado á partir da segunda temporada conferimos que Vikings aumentou consideravelmente sua média (cerca de 0,5) no, mas o gráfico nos mostra que House of Cards em todas suas temporadas se manteve com uma média de votos dos usuários superior as outras séries.
+
+## Conclusão
+Diante das análises observadas acima, consideramos que a série House of Cards como mais bem avaliada pelos usuários no site [IMDB](https://www.imdb.com/) diante no conjunto avaliado, tendo uma diferença pequena entre as outras duas series avaliadas no processo em relação a suas médias e considerando a concentração de votos de House of Cards em sua maioria superior à nota 8,5 e também considerando á analise por temporada verificamos que House of Cards manteve superior sua média de votos por episódio em todas as temporadas sem ter nenhuma variação.
+
+## Qual das séries que você escolheu tem episódios de qualidade mais irregular segundo o IMDB? A diferença é grande? Pequena?
+
+Para responder a essa pergunta, iremos trabalhar com um conceito chamado desvio padrão, um parâmetro muito usado em estatística que indica o grau de variação de um conjunto de elementos. No nosso caso, usaremos o desvio padrão para indicar o grau de varição das avaliações dos episódios de uma série. Portanto, quanto maior o desvio padrão, maior será a irregularidade entre as notas dos episódios de uma série — ou seja, as notas variam muito de um episódio para outro.
+
+```{r}
+
+dados_escolhidos %>%
+    group_by(series_name) %>%
+    summarise(dp = sd(user_rating)) %>%
+    ggplot(aes(x = reorder(series_name, dp), 
+           y = dp, 
+           fill = series_name)) +
+    geom_bar(stat = "identity",
+           alpha = .7, 
+           width = .75) +
+    labs(y = "Desvio Padrão", x = "Séries Escolhidas")
+```
+
+Pelo gráfico podemos observa que a série The Blacklist com um desvio padrão maior entre elas e desse modo está série possui uma maior irregularidade entre as notas de seus episódios tendem uma variação maior entre seus episódios, mas devemos lidar com valores extremos que pode afetar o desvio padrão e desse modo calculamos o IQR.
+A sigla IQR significa "Interquartile Range" (em português, Variação Interquartil) e é utilizada em análises estatísticas para ajudar nas conclusões a cerca de um conjunto de dados. Geralmente é mais preferível que a variância para se medir a dispersão de um conjunto de dados, pois exclui a maioria dos elementos discrepantes do conjunto.
+IQR nos ajuda pôs pouco varia independente da existência de valores muito extremos.
+
+O IQR é calculado levando em consideração a diferença entre o terceiro e primeiro quartil, ou seja, os 50% de valores mais concentrados.
+
+
+```{r}
+dados_escolhidos %>%
+    group_by(series_name) %>%
+    summarise(dp = IQR(user_rating)) %>%
+    ggplot(aes(x = reorder(series_name, dp), 
+           y = dp, 
+           fill = series_name)) +
+    geom_bar(stat = "identity",
+           alpha = .7, 
+           width = .75) +
+    labs(y = "IQR", x = "Séries Escolhidas")
+```
+
+
+## Conclusão
+Observando esse gráfico pode concluir que a série The Blacklist possui maior irregularidade entre as notas de seus episódios e diante da análise feita observamos também que a diferença perante House of cards que apareceu em segundo no lugar no grafico, relativamente pequena baseado nas medidas do desvio padrão (0.09 a mais)  e IQR (0.25 a mais), por fim verificamos que a diferença de qualidade dos episódios de The Blacklist em relação a outras como pequena. 
+
+## Episódios no início/fim da temporada são mais bem avaliados que os no meio? O que tende a ser melhor? Inícios ou finais de séries/temporadas?
+Analise em questão é sobre os episódios no início/ fim da temporada e verificas se existe alguma diferença entre eles e algo que consideramos que tende a ser melhor . 
+
+```{r}
+    dados_escolhidos %>% 
+    ggplot(aes(x = season_ep,
+               y = user_rating,
+               color = series_name,
+               group = series_name))+
+    geom_line() +
+    facet_grid(series_name ~ season) + 
+    labs(y = "Ratings dos usuários", x = "Numero de Episodio por Temporada")
+    
+```
+De acordo com o gráfico na primeira e segunda temporada verificamos que House of Cards tem seus episódios do início bem avaliados, mas com o decorrer da metade (temporada) seu nível cai e volta a subir no final da temporada, em relação à terceira e quarta verificamos que o início não foi tão bem, mas á série consegue manter um nível alto na metade/fim.
+The Blacklist mostra um comportamento padrão para as 4 temporadas de modo que seus episódios do início/fim tendem á ser mais bem avaliados do que os episódios da metade da temporada.
+Vikings apenas sua primeira temporada demostra um comportamento diferente das demais como observamos os primeiros/últimos episódios como não tão bem avaliados, mas no decorrer da metade seus episódios demostram um padrão muito bem avaliados, em relação as outras temporadas observa um comportamento padrão onde o início e metade da temporada se mantêm na mesma avaliação aumentando no episódio finais de cada temporada.
+
+## Qual das séries ou temporadas tem episódios mais sem graça? (Um episódio é sem graça se ninguém nem ama nem odeia ele)
+
+Analise de episódios mais sem graça e para isso utilizaremos o episódios em que obtiveram mais nota 5 considerando uma nota de 1 á 10 a nota 5 refere a metade do intervalo e desse modo se encaixa no tipo de episódio sem graça.
+
+```{r}
+dados_escolhidos %>%
+    group_by(series_name) %>%
+    ggplot(aes(x = r5, 
+               y = season, 
+               color = series_name)) +
+    geom_point(alpha = .7) +
+    labs(y = "Temporadas",
+         x = "Proporção de votos neutros (Igual á 5)") 
+    
+```
+
+
+Como demostrado no gráfico acima a série que possui maior numero de episódios sem graça é The Blacklist, mas especificamente nas segunda e quarta temporada onde tem um número crescente de episódios sem graça, já na primeira temporada verificamos que Vikings e House of Cards obteve um número maior de número de episódios sem graça, porém isto não influencia no resultado final.
+
+
+
+

@@ -1,0 +1,159 @@
+---
+title: 'Pró direitos humanos : Direita (X) Esquerda'
+output:
+  html_document:
+    df_print: paged
+author: Vinicius Brandão
+---
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(here)
+library(plotly)
+theme_set(theme_bw())
+```
+
+
+Analisaremos o conjunto de dados de 890 candidatos que comentaram assuntos pró direitos humanos em todo o Brasil, percorrendo 244 cidades em 24 estados os candidatos a vereadores da eleição de 2016 responderão se foram a favor desses temas. Separamos no conjunto dos dados os partidos em dois lados (Esquerda, Direita) para isso baseamos no [site](http://www.bbc.com/portuguese/brasil-41058120) e assim classificamos os seguintes partidos como de Esquerda: PT,PDT,PTdoB,PSB,REDE,PSOL,PC do B, PCB.
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+respostas = read_csv(here::here("data/respostas-merepresenta-2016.csv"), 
+                     col_types = cols(.default = col_character(), 
+                                      nota_partido = col_integer(), 
+                                      votos_recebidos = col_integer()))
+
+# A versão long (em vez de wide) dos dados facilita muito pro ggplot:
+respostas_long = 
+    respostas %>% 
+    gather(key = "tema", 
+           value = "resposta", 
+           10:23) %>%
+  mutate(lado = sigla_partido %in% c("PT","PDT","PTdoB","PSB","PROS","REDE","PSOL","PC do B","PCB"))
+```
+
+Para conhcer mais os dados iremos observar quais os temas presente e sua proporção do temas mais aprovados e menos aprovados.
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+por_tema = 
+    respostas_long %>% 
+    group_by(tema) %>% 
+    summarise(apoio = sum(resposta == "S") / n())
+
+por_tema %>% 
+    ggplot(aes(x = reorder(tema, apoio), y = apoio, ymax = apoio, ymin = 0)) + 
+    geom_point(size = 2) + 
+    geom_linerange(size = .3) + 
+    scale_y_continuous(limits = c(0, 1)) + 
+    coord_flip() + 
+    labs(
+        y = "Proporção de apoios", 
+        x = ""
+    )
+```
+Como podemos observar os temas que foram votado e sua proporção considerando que o tema orçamento participativo como o tema de mais interesse de todos os que votaram e desmilitarização da policia como o o menos vota entre os candidados.
+
+##Qual partido está mais em defesa dos temas relacionados a classe LGBT?
+Para verificar está associação analisamos a proporção associada ao numero de respostas á favor desses temas e os partidos que são á favor desses temas.
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+respostas_long %>%
+  filter(tema %in% c("Adoção por famílias LGBTs",
+                     "Respeito à identidade de gênero de pessoas trans",
+                     "Criminalização da LGBTfobia") ) %>% 
+  group_by(sigla_partido,lado) %>%
+  summarise(proporção = sum(resposta ==  "S")/n(), 
+            quantidade = n()) %>%
+  plot_ly(x = ~proporção, 
+             y = ~reorder(sigla_partido,proporção),
+            text = ~paste("Partido: ", sigla_partido, 
+                          "\nEsquerda:", lado,
+                          "\nQuantidade de candidatos no partido:",quantidade),
+    color = ~lado) 
+```
+Como podemos observar o partido PSTU e PCB como os partidos mais á favor do tema, porém, podemos analisar em relação a seu tamanho que o número de candidatos desses partidos que responderam o questionamento como muito pequeno e assim torna mais fácil em sua totalidade todos serem á favor do tema, tirando esse paramentro de tamanho observamos os partidos como PSOL, PT com uma grande quantidade de candidatos e observamos que em sua maioria esses partidos estão em grande defesa nos temas relacionado a LGBT.
+Observamos que os partidos que menos apoia esses temas são partidos considerados Cristãos são eles PRB, PSC, PHS e PSDC.
+
+### Qual gênero é mais favoravel com a causa LGBT?
+Para isso analisamos como está a distribuição de homens e mulheres nos dados e suas devidas proporção de apoio aos temas relacionados.
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+respostas_long %>%
+  filter(tema %in% c("Adoção por famílias LGBTs",
+                     "Respeito à identidade de gênero de pessoas trans",
+                     "Criminalização da LGBTfobia"), genero %in% c("MASCULINO","FEMININO")) %>% 
+  group_by(genero,lado) %>%
+  summarise(proporção = sum(resposta ==  "S")/n(), 
+            quantidade = n()) %>%
+ plot_ly(x = ~proporção, 
+             y = ~reorder(genero,proporção),
+            text = ~paste("Esquerda:", lado,
+                          "\nQuantidade",quantidade),
+             color = ~lado) 
+    
+  
+```
+Podemos observa que existe uma diferença entre o número de mulheres e homens considerando que o número de homens chega a ser quase o dobro do que os das mulheres.
+Observamos que a proporção de mulheres que apoia causas com temas relacionados a classe LGBT maiores do que a dos homens e podemos observa também que em sua (maioria) tanto homens e mulheres da Esquerda tem uma proporção maior de serem á favores dessas temáticas.
+Observamos que homens de partidos do lado direito tende á ser mais contra a esses temas. 
+
+
+##Qual Estádo onde onde o tema sobre violência contra mulher é mais considerado entre os candidatos.
+Utilizaremos medida de proporção em relação aos estados com o tema de Combate à violência conta mulher e assim também observar se direita ou esquerda qual lado estária mais á favor deste tema. 
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+respostas_long %>%
+  filter(tema %in% c("Combate à violência contra mulher") ) %>% 
+  group_by(sigla_estado,lado) %>%
+  summarise(proporção = sum(resposta ==  "S")/n(), 
+            quantidade = n()) %>%
+  plot_ly(x =  ~proporção, 
+             y =  ~reorder(sigla_estado,proporção),
+             text = ~paste("Estado: ", sigla_estado, 
+                          "\nEsquerda:", lado,
+                          "\nQuantidade de candidatos nos partidos:",quantidade),
+             color =  ~lado) 
+    
+```
+Como podemos observar em sua maioria os em relação aos estados são á favor do combate da violência contra a mulher observamos a proporção 1, mas podemos considerar que o número de candidatos desses estados como algo pequeno diante da amostra.
+Podemos considerar o estado de São Paulo em específico em que os lados de Esquerda (x) Direita toda proporções um pouco diferente e nesse estado observamos um número considerável de candidatos que respondeu o questionário assim observamos que a proporção dos candidatos de Esquerda um pouco maior, mas considerando ambos os lados o estado tem uma proporção boa de candidatos á favor do tema.
+
+### Qual perfil dos candidatos da Bahia e quais temas eles são mais favoraveis.
+
+Primeiro analisaremos o perfil considerando o gênero e cor dos candidatos deste estado para conhecer um pouco mais tendo em vista na questão sobre violência conta mulher o estado não se comporta.
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+respostas_long %>%
+  filter(sigla_estado == "BA") %>%
+  group_by(genero,cor_tse) %>%
+  summarise(count = n()) %>%
+  plot_ly(x = ~cor_tse,  y =  ~count,   color =  ~genero)
+  
+```
+
+Observamos que na Bahia em sua maioria os candidatos são da cor declarada preta e possui mais homens.
+
+Nesse aspecto podemos observa qual tema em que possui maio (proporção) de apoio dos candidatos da Bahia.
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+  respostas_long %>%
+  filter(sigla_estado == "BA" ) %>% 
+  group_by(tema) %>%
+  summarise(proporção = sum(resposta ==  "S")/n(), 
+            quantidade = n()) %>%
+    ggplot(aes(x = reorder(tema, proporção), y = proporção, ymax = proporção, ymin = 0)) + 
+    geom_point(size = 2) + 
+    geom_linerange(size = .3) + 
+    scale_y_continuous(limits = c(0, 1)) + 
+    coord_flip() + 
+    labs(
+        y = "Proporção de apoios", 
+        x = ""
+    )
+```
+Podemos observar que transparência e orçamento participativo como temas com uma grande proporção e que coincide com o tema geral entre os candidatos, mas vale observar que o tema Cota para mulheres no legislativo como um tema que teve a mesma proporção considerada alta entre os temas e algo que não foi tão votado pelos outros estados no contexto geral. Vale salientar que o número de mulheres candidatas que participaram da pesquisa não foi nada relativamente grande considerando que o número de homens quase o dobro, podemos associar isto aos dados do IBGE que mostra que a Bahia é um dos estados que menos tem participação na câmera legislativa e desse modo consideramos que esse tema é algo recorrente na política baiana baseado. [Dados Baseados nesta reportagem](https://www.correio24horas.com.br/noticia/nid/bahia-tem-menor-numero-de-mulheres-no-congresso-e-3o-em-pms/)
+
+## Conclusão
+Devemos considerar que os dados abordados é baseado em uma pesquisa feita onde todos os candidatos que respondeu foram de forma voluntario e nem todos os candidatos que participarão da eleição de 2016 responderam e desse modo o que foi demostrado acima não podemos considerar como uma verdade absoluta para os partidos ou para os lados (Esquerda, Direita) e assim podemos frisar que como se trata de eleições municipais muitos candidatos trocam de partidos por algo que os beneficiam e não pelo que o partido representa as caraterística que carregam e desse modo as vezes candidatos podem se colocar contra temáticas defendidas pelo próprio partido.
+Assim concluímos que o que foi demostrado são assuntos relacionado aos dados e nem sempre o que está exposto foi o que realmente o candidato fez caso tenha sido eleito.
+
+
+
